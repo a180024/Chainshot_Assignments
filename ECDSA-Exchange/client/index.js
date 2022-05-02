@@ -1,5 +1,7 @@
 import "./index.scss";
 let EC = require("elliptic").ec;
+let SHA256 = require("crypto-js/SHA256");
+
 let ec = new EC("secp256k1");
 
 const server = "http://localhost:3042";
@@ -28,23 +30,15 @@ document.getElementById("transfer-amount").addEventListener("click", () => {
   const privateKey = document.getElementById("private-key").value;
 
   // Sign message
-  const msgHash = "Authentication";
   const key = ec.keyFromPrivate(privateKey, "hex");
   const sender = key.getPublic().encode("hex");
-  console.log("publicKey", sender);
-  const signature = key.sign(msgHash);
-  const derSign = signature.toDER();
-  const isVerified = key.verify(msgHash, derSign);
-  if (!isVerified) {
-    alert("Failed to authenticate");
-    return false;
-  }
-  console.log(isVerified);
+  const tx = { recipient, amount };
+  const signature = key.sign(SHA256(JSON.stringify(tx)).toString());
 
   const body = JSON.stringify({
+    tx,
+    signature,
     sender,
-    amount,
-    recipient,
   });
 
   const request = new Request(`${server}/send`, { method: "POST", body });
