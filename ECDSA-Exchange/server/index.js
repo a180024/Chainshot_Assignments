@@ -1,5 +1,6 @@
-const express = require("express");
-const EC = require("elliptic").ec;
+let express = require("express");
+let SHA256 = require("crypto-js/SHA256");
+let EC = require("elliptic").ec;
 const app = express();
 const cors = require("cors");
 const port = 3042;
@@ -16,16 +17,6 @@ for (let i = 0; i < 3; i++) {
   balances[publicKey] = 100;
 }
 
-// var ec = new EC("secp256k1");
-// var key = ec.genKeyPair();
-// console.log("key", key.getPublic().encode("hex"));
-// console.log("priv", key.getPrivate());
-// const balances = {
-// 1: 100,
-// 2: 50,
-// 3: 75,
-// };
-
 // localhost can have cross origin errors
 // depending on the browser you use!
 app.use(cors());
@@ -39,12 +30,20 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", (req, res) => {
-  const { sender, recipient, amount } = req.body;
-  balances[sender] -= amount;
-  balances[recipient] = (balances[recipient] || 0) + +amount;
-  console.log("sender balance", balances[sender]);
-  console.log("recipient balance", balances[recipient]);
-  res.send({ balance: balances[sender] });
+  const { tx, signature, sender } = req.body;
+  // Verify that the signature comes from the sender(public key)
+  const key = ec.keyFromPublic(sender, "hex");
+  const hash = SHA256(JSON.stringify(tx)).toString();
+  console.log(tx);
+  if (key.verify(hash, signature)) {
+    balances[sender] -= tx.amount;
+    balances[tx.recipient] = (balances[tx.recipient] || 0) + +tx.amount;
+    console.log("sender balance", balances[sender]);
+    console.log("recipient balance", balances[tx.recipient]);
+    res.send({ balance: balances[sender] });
+  } else {
+    res.sendStatus(400);
+  }
 });
 
 app.listen(port, () => {
